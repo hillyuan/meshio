@@ -107,6 +107,7 @@ def read_buffer(f):
     cell_data = {}
     point_data = {}
     point_gid = numpy.array([], dtype=int)
+    el_gid = numpy.array([], dtype=int)
 
     while True:
         line = f.readline()
@@ -123,7 +124,7 @@ def read_buffer(f):
             elif word.startswith("NODE"):
                 points, point_gid = _read_nodes(f, point_gid, points)
             elif word.startswith("ELEMENT"):
-                cells = _read_cells(f, word, cells)
+                cells, el_gid = _read_cells(f, word, el_gid, cells)
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
                 set_ids = read_set(f, params_map)
@@ -158,9 +159,7 @@ def read_buffer(f):
 
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_gid(point_gid, cells)
-    print (nsets)
     nsets = _scan_gid(point_gid, nsets)
-    print (nsets)
     return points, cells, point_data, cell_data, field_data, nsets
 
 
@@ -178,7 +177,7 @@ def _read_nodes(f, point_gid, points):
     return points, point_gid
 
 
-def _read_cells(f, line0, cells):
+def _read_cells(f, line0, el_gid, cells):
     sline = line0.split(",")[1:]
     etype_sline = sline[0]
     assert "TYPE" in etype_sline, etype_sline
@@ -196,6 +195,7 @@ def _read_cells(f, line0, cells):
         if line.startswith("*"):
             break
         data = [int(k) for k in filter(None, line.split(","))]
+        el_gid = numpy.append(el_gid, int(data[0]))
         cells[t].append(data[-num_nodes_per_elem:])
 
     # convert to numpy arrays
@@ -205,7 +205,7 @@ def _read_cells(f, line0, cells):
         cells[key] = numpy.array(cells[key], dtype=int)
 
     f.seek(last_pos)
-    return cells
+    return cells, el_gid
 
 
 def _scan_gid(point_gid, cells):
@@ -278,7 +278,7 @@ def read_set(f, params_map):
     return set_ids
 
 def read_s_set(f):
-    """reads a side set"""
+    """read a side set"""
     es_ids = numpy.array([], dtype=int)
     p = numpy.arange(2, dtype=int)
     while True:
@@ -290,7 +290,7 @@ def read_s_set(f):
         assert len(set_ids) == 2, set_ids
         p[0] = int(set_ids[0])
         p[1] = int(set_ids[1].strip().upper().strip("S"))
-        numpy.append( es_ids, p )
+        es_ids = numpy.append( es_ids, p )
 
     f.seek(last_pos)
     return es_ids

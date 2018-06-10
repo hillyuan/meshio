@@ -220,6 +220,7 @@ def write(filename, points, cells, point_data=None, cell_data=None,
         rootgrp.createDimension(dim1, values.shape[0])
         dtype = numpy_to_exodus_dtype[values.dtype.name]
         data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
+        # Exodus is 1-based
         data[:] = values + 1
 
     rootgrp.close()
