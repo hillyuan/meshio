@@ -160,6 +160,7 @@ def read_buffer(f):
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_gid(point_gid, cells)
     nsets = _scan_gid(point_gid, nsets)
+    _scan_ss_gid(el_gid, ssets)
     return points, cells, point_data, cell_data, field_data, nsets
 
 
@@ -213,6 +214,15 @@ def _scan_gid(point_gid, cells):
         for value in numpy.nditer(arr, op_flags=["readwrite"]):
             value[...] = numpy.flatnonzero(point_gid == value)[0]
     return cells
+
+def _scan_ss_gid(el_gid, ssets):
+    for k, arr in ssets.items():
+        arr = numpy.reshape( arr,(-1,2) )
+        for i, value in enumerate(arr[:,0]):
+            na = numpy.flatnonzero(el_gid == value)[0]
+            arr[i,0] = na
+        ssets[k] = arr
+    return ssets
 
 
 def get_param_map(word, required_keys=None):
