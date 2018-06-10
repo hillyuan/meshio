@@ -14,7 +14,7 @@ def _main():
     args = _parse_options()
 
     # read mesh data
-    points, cells, point_data, cell_data, field_data, nsets= meshio.read(
+    points, cells, point_data, cell_data, field_data, nsets, ssets= meshio.read(
         args.infile, file_format=args.input_format
     )
 
@@ -71,6 +71,7 @@ def _main():
         cell_data=cell_data,
         field_data=field_data,
         nsets=nsets,
+        ssets=ssets,
     )
 
     return

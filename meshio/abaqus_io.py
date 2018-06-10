@@ -160,8 +160,8 @@ def read_buffer(f):
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_gid(point_gid, cells)
     nsets = _scan_gid(point_gid, nsets)
-    _scan_ss_gid(el_gid, ssets)
-    return points, cells, point_data, cell_data, field_data, nsets
+    ssets = _scan_ss_gid(el_gid, ssets)
+    return points, cells, point_data, cell_data, field_data, nsets, ssets
 
 
 def _read_nodes(f, point_gid, points):

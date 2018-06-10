@@ -161,6 +161,7 @@ def write(
     field_data=None,
     file_format=None,
     nsets=None,
+    ssets=None,
 ):
     """Writes mesh together with data to a file.
 
@@ -174,6 +175,7 @@ def write(
     cell_data = {} if cell_data is None else cell_data
     field_data = {} if field_data is None else field_data
     nsets = {} if nsets is None else nsets
+    ssets = {} if ssets is None else ssets
 
     if not file_format:
         # deduce file format from extension
@@ -303,5 +305,6 @@ def write(
             cell_data=cell_data,
             field_data=field_data,
             nsets=nsets,
+            ssets=ssets,
         )
     return

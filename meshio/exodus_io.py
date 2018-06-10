@@ -121,13 +121,14 @@ numpy_to_exodus_dtype = {
 
 
 def write(filename, points, cells, point_data=None, cell_data=None, 
-          field_data=None, nsets=None):
+          field_data=None, nsets=None, ssets=None):
     import netCDF4
 
     point_data = {} if point_data is None else point_data
     cell_data = {} if cell_data is None else cell_data
     field_data = {} if field_data is None else field_data
     nsets = {} if nsets is None else nsets
+    ssets = {} if ssets is None else ssets
 
     rootgrp = netCDF4.Dataset(filename, "w")
 
@@ -146,6 +147,7 @@ def write(filename, points, cells, point_data=None, cell_data=None,
     rootgrp.createDimension("num_elem", total_num_elems)
     rootgrp.createDimension("num_el_blk", len(cells))
     rootgrp.createDimension("num_node_sets", len(nsets))
+    rootgrp.createDimension("num_side_sets", len(ssets))
     rootgrp.createDimension("len_string", 33)
     rootgrp.createDimension("len_line", 81)
     rootgrp.createDimension("four", 4)
@@ -209,19 +211,37 @@ def write(filename, points, cells, point_data=None, cell_data=None,
             node_data[0, k] = data
             
     #node sets
-    data = rootgrp.createVariable("ns_prop1", "i4", "num_node_sets")
-    data_names = rootgrp.createVariable("ns_names", "S1", ("num_node_sets", "len_string"))
-    for k, name in enumerate(nsets.keys()):
-        data[k] = k
-        for i, letter in enumerate(name):
-            data_names[k, i] = letter.encode("utf-8")
-    for k, (key, values) in enumerate(nsets.items()):
-        dim1 = "num_nod_ns{}".format(k + 1)
-        rootgrp.createDimension(dim1, values.shape[0])
-        dtype = numpy_to_exodus_dtype[values.dtype.name]
-        data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
-        # Exodus is 1-based
-        data[:] = values + 1
+    if len(nsets)>0:
+        data = rootgrp.createVariable("ns_prop1", "i4", "num_node_sets")
+        data_names = rootgrp.createVariable("ns_names", "S1", ("num_node_sets", "len_string"))
+        for k, name in enumerate(nsets.keys()):
+            data[k] = k
+            for i, letter in enumerate(name):
+                data_names[k, i] = letter.encode("utf-8")
+        for k, (key, values) in enumerate(nsets.items()):
+            dim1 = "num_nod_ns{}".format(k + 1)
+            rootgrp.createDimension(dim1, values.shape[0])
+            dtype = numpy_to_exodus_dtype[values.dtype.name]
+            data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
+            # Exodus is 1-based
+            data[:] = values + 1
+        
+    #side sets
+    if len(ssets)>0:
+        data = rootgrp.createVariable("ss_prop1", "i4", "num_side_sets")
+        data_names = rootgrp.createVariable("ss_names", "S1", ("num_side_sets", "len_string"))
+        for k, name in enumerate(ssets.keys()):
+            data[k] = k
+            for i, letter in enumerate(name):
+                data_names[k, i] = letter.encode("utf-8")
+        for k, (key, values) in enumerate(ssets.items()):
+            dim1 = "num_side_ss{}".format(k + 1)
+            rootgrp.createDimension(dim1, values.shape[0])
+            dtype = numpy_to_exodus_dtype[values.dtype.name]
+            data = rootgrp.createVariable("elem_ss{}".format(k + 1), dtype, (dim1,))
+            data[:] = values[:,0] + 1
+            data = rootgrp.createVariable("side_ss{}".format(k + 1), dtype, (dim1,))
+            data[:] = values[:,1] - 1
 
     rootgrp.close()
     return
