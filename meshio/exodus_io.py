@@ -212,13 +212,16 @@ def write(filename, points, cells, point_data=None, cell_data=None,
     data = rootgrp.createVariable("ns_prop1", "i4", "num_node_sets")
     for k in range(len(nsets)):
         data[k] = k
+    data_names = rootgrp.createVariable("ns_names", "S1", ("num_node_sets", "len_string"))
+    for k, name in enumerate(nsets.keys()):
+            for i, letter in enumerate(name):
+                data_names[k, i] = letter.encode("utf-8")
     for k, (key, values) in enumerate(nsets.items()):
         dim1 = "num_nod_ns{}".format(k + 1)
         rootgrp.createDimension(dim1, values.shape[0])
         dtype = numpy_to_exodus_dtype[values.dtype.name]
         data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
-        # Exodus is 1-based
-        data[:] = values+1
+        data[:] = values
 
     rootgrp.close()
     return
