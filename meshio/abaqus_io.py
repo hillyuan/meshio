@@ -126,6 +126,7 @@ def read_buffer(f):
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
                 setids = read_set(f, params_map)
+                print (setids)
                 name = params_map["NSET"]
                 if name not in nsets:
                     nsets[name] = []
@@ -243,17 +244,18 @@ def read_set(f, params_map):
         line = f.readline()
         if line.startswith("*"):
             break
-        set_ids += line.strip(", ").split(",")
+        lset_ids = line.strip().split(",")
 
-    if "generate" in params_map:
-        assert len(set_ids) == 3, set_ids
-        set_ids = numpy.arange(int(set_ids[0]), int(set_ids[1]), int(set_ids[2]))
-    else:
-        try:
-            set_ids = numpy.unique(numpy.array(set_ids, dtype="int32"))
-        except ValueError:
-            print(set_ids)
-            raise
+        if "GENERATE" in params_map:
+            assert len(lset_ids) == 3, lset_ids
+            set_ids = numpy.append( set_ids, numpy.arange(int(lset_ids[0]), 
+                int(lset_ids[1])+1, int(lset_ids[2])) )
+        else:
+            try:
+                set_ids += numpy.unique(numpy.array(set_ids, dtype="int32"))
+            except ValueError:
+                print(set_ids)
+                raise
     f.seek(last_pos)
     return set_ids
 
