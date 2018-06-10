@@ -101,6 +101,7 @@ def read_buffer(f):
     points = []
     cells = {}
     nsets = {}
+    ssets = {}
     elsets = {}
     field_data = {}
     cell_data = {}
@@ -134,6 +135,17 @@ def read_buffer(f):
                     a = nsets[name]
                 c = numpy.concatenate((a, set_ids))
                 nsets[name] = c
+            elif word.startswith("SURFACE"):
+                params_map = get_param_map(word, required_keys=["NAME"])
+                es_ids = read_s_set(f)
+                name = params_map["NAME"]
+                if name not in ssets:
+                    ssets[name] = []
+                    a = numpy.array([], dtype=int)
+                else:
+                    a = ssets[name]
+                c = numpy.concatenate((a, es_ids))
+                ssets[name] = c
             elif word.startswith("ELSET"):
                 params_map = get_param_map(word, required_keys=["ELSET"])
                 set_ids = read_set(f, params_map)
@@ -145,7 +157,10 @@ def read_buffer(f):
                 pass
 
     points = numpy.reshape(points, (-1, 3))
-    cells = _scan_cells(point_gid, cells)
+    cells = _scan_gid(point_gid, cells)
+    print (nsets)
+    nsets = _scan_gid(point_gid, nsets)
+    print (nsets)
     return points, cells, point_data, cell_data, field_data, nsets
 
 
@@ -193,7 +208,7 @@ def _read_cells(f, line0, cells):
     return cells
 
 
-def _scan_cells(point_gid, cells):
+def _scan_gid(point_gid, cells):
     for arr in cells.values():
         for value in numpy.nditer(arr, op_flags=["readwrite"]):
             value[...] = numpy.flatnonzero(point_gid == value)[0]
@@ -261,6 +276,24 @@ def read_set(f, params_map):
                 raise
     f.seek(last_pos)
     return set_ids
+
+def read_s_set(f):
+    """reads a side set"""
+    es_ids = numpy.array([], dtype=int)
+    p = numpy.arange(2, dtype=int)
+    while True:
+        last_pos = f.tell()
+        line = f.readline()
+        if line.startswith("*"):
+            break
+        set_ids = line.strip().split(",")
+        assert len(set_ids) == 2, set_ids
+        p[0] = int(set_ids[0])
+        p[1] = int(set_ids[1].strip().upper().strip("S"))
+        numpy.append( es_ids, p )
+
+    f.seek(last_pos)
+    return es_ids
 
 
 def write(filename, points, cells, point_data=None, cell_data=None, field_data=None):
