@@ -125,25 +125,28 @@ def read_buffer(f):
                 cells = _read_cells(f, word, cells)
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
-                setids = read_set(f, params_map)
-                print (setids)
+                set_ids = read_set(f, params_map)
                 name = params_map["NSET"]
                 if name not in nsets:
                     nsets[name] = []
-                nsets[name].append(setids)
+                    a = numpy.array([], dtype=int)
+                else:
+                    a = nsets[name]
+                c = numpy.concatenate((a, set_ids))
+                nsets[name] = c
             elif word.startswith("ELSET"):
                 params_map = get_param_map(word, required_keys=["ELSET"])
-                setids = read_set(f, params_map)
+                set_ids = read_set(f, params_map)
                 name = params_map["ELSET"]
                 if name not in elsets:
                     elsets[name] = []
-                elsets[name].append(setids)
+                elsets[name].append(set_ids)
             else:
                 pass
 
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_cells(point_gid, cells)
-    return points, cells, point_data, cell_data, field_data
+    return points, cells, point_data, cell_data, field_data, nsets
 
 
 def _read_nodes(f, point_gid, points):
@@ -238,7 +241,7 @@ def get_param_map(word, required_keys=None):
 
 def read_set(f, params_map):
     """reads a set"""
-    set_ids = []
+    set_ids = numpy.array([], dtype=int)
     while True:
         last_pos = f.tell()
         line = f.readline()
@@ -252,7 +255,7 @@ def read_set(f, params_map):
                 int(lset_ids[1])+1, int(lset_ids[2])) )
         else:
             try:
-                set_ids += numpy.unique(numpy.array(set_ids, dtype="int32"))
+                set_ids += numpy.unique(numpy.array(lset_ids, dtype="int32"))
             except ValueError:
                 print(set_ids)
                 raise

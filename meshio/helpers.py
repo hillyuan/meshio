@@ -104,6 +104,7 @@ def read(filename, file_format=None):
     :type point_data: dict
     :returns field_data: Field data read from file.
     :type field_data: dict
+    :nsets: dict
     """
     # https://stackoverflow.com/q/4843173/353337
     assert isinstance(filename, str)
@@ -159,6 +160,7 @@ def write(
     cell_data=None,
     field_data=None,
     file_format=None,
+    nsets=None,
 ):
     """Writes mesh together with data to a file.
 
@@ -171,6 +173,7 @@ def write(
     point_data = {} if point_data is None else point_data
     cell_data = {} if cell_data is None else cell_data
     field_data = {} if field_data is None else field_data
+    nsets = {} if nsets is None else nsets
 
     if not file_format:
         # deduce file format from extension
@@ -299,5 +302,6 @@ def write(
             point_data=point_data,
             cell_data=cell_data,
             field_data=field_data,
+            nsets=nsets,
         )
     return

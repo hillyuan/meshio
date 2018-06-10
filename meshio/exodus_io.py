@@ -120,12 +120,14 @@ numpy_to_exodus_dtype = {
 }
 
 
-def write(filename, points, cells, point_data=None, cell_data=None, field_data=None):
+def write(filename, points, cells, point_data=None, cell_data=None, 
+          field_data=None, nsets=None):
     import netCDF4
 
     point_data = {} if point_data is None else point_data
     cell_data = {} if cell_data is None else cell_data
     field_data = {} if field_data is None else field_data
+    nsets = {} if nsets is None else nsets
 
     rootgrp = netCDF4.Dataset(filename, "w")
 
@@ -143,10 +145,11 @@ def write(filename, points, cells, point_data=None, cell_data=None, field_data=N
     rootgrp.createDimension("num_dim", 3)
     rootgrp.createDimension("num_elem", total_num_elems)
     rootgrp.createDimension("num_el_blk", len(cells))
+    rootgrp.createDimension("num_node_sets", len(nsets))
     rootgrp.createDimension("len_string", 33)
     rootgrp.createDimension("len_line", 81)
     rootgrp.createDimension("four", 4)
-    rootgrp.createDimension("time_step", None)
+    rootgrp.createDimension("time_step", 0)
 
     # dummy time step
     data = rootgrp.createVariable("time_whole", "f4", "time_step")
@@ -204,6 +207,18 @@ def write(filename, points, cells, point_data=None, cell_data=None, field_data=N
         )
         for k, (name, data) in enumerate(point_data.items()):
             node_data[0, k] = data
+            
+    #node sets
+    data = rootgrp.createVariable("ns_prop1", "i4", "num_node_sets")
+    for k in range(len(nsets)):
+        data[k] = k
+    for k, (key, values) in enumerate(nsets.items()):
+        dim1 = "num_nod_ns{}".format(k + 1)
+        rootgrp.createDimension(dim1, values.shape[0])
+        dtype = numpy_to_exodus_dtype[values.dtype.name]
+        data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
+        # Exodus is 1-based
+        data[:] = values+1
 
     rootgrp.close()
     return
