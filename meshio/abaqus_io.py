@@ -205,7 +205,7 @@ def _read_cells(f, line0, el_gid, el_type, cells):
             break
         data = [int(k) for k in filter(None, line.split(","))]
         el_gid = numpy.append(el_gid, int(data[0]))
-        el_type.append(etype) 
+        el_type.append(etype)
         cells[t].append(data[-num_nodes_per_elem:])
 
     # convert to numpy arrays
@@ -234,8 +234,8 @@ def _scan_ss_gid(el_gid, el_type, ssets):
             if etype not in abaqus_to_exodus_face:
                 msg = "Surface index not available for element: " + etype
                 raise RuntimeError(msg)
-            face_index = abaqus_to_exodus_face[arr[i,1]]
-            arr[i,1] = face_index
+            face_index = abaqus_to_exodus_face[etype]
+            arr[i,1] = face_index[arr[i,1]-1]
         ssets[k] = arr
     return ssets
 

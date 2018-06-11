@@ -241,7 +241,7 @@ def write(filename, points, cells, point_data=None, cell_data=None,
             data = rootgrp.createVariable("elem_ss{}".format(k + 1), dtype, (dim1,))
             data[:] = values[:,0] + 1
             data = rootgrp.createVariable("side_ss{}".format(k + 1), dtype, (dim1,))
-            data[:] = values[:,1] - 1
+            data[:] = values[:,1]
 
     rootgrp.close()
     return
