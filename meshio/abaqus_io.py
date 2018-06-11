@@ -224,18 +224,18 @@ def _scan_gid(point_gid, cells):
             value[...] = numpy.flatnonzero(point_gid == value)[0]
     return cells
 
-def _scan_ss_gid(el_gid, ssets):
+def _scan_ss_gid(el_gid, el_type, ssets):
     for k, arr in ssets.items():
         arr = numpy.reshape( arr,(-1,2) )
         for i, value in enumerate(arr[:,0]):
             na = numpy.flatnonzero(el_gid == value)[0]
             arr[i,0] = na
-        if k not in abaqus_to_exodus_face:
-            msg = "Surface index not available foe element: " + k
-            raise RuntimeError(msg)
-        face_index = abaqus_to_exodus_face[k]
-        for i, value in enumerate(arr[:,1]):
-            arr[i,1] = face_index[i]
+            etype = el_type[na]
+            if etype not in abaqus_to_exodus_face:
+                msg = "Surface index not available for element: " + etype
+                raise RuntimeError(msg)
+            face_index = abaqus_to_exodus_face[arr[i,1]]
+            arr[i,1] = face_index
         ssets[k] = arr
     return ssets
 
