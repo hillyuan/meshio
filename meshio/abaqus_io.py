@@ -10,6 +10,13 @@ import numpy
 from .__about__ import __version__
 from .gmsh_io import num_nodes_per_cell
 
+abaqus_to_exodus_face = {
+    "S3": [1,2,3],
+    "S4": [1,2,3,4,5,6],
+    "C3D4": [4,1,2,3],
+    "C3D8": [5,6,1,2,3,4],
+    "C3D6": [4,5,1,2,3],
+}
 
 abaqus_to_meshio_type = {
     # trusss
@@ -108,6 +115,7 @@ def read_buffer(f):
     point_data = {}
     point_gid = numpy.array([], dtype=int)
     el_gid = numpy.array([], dtype=int)
+    el_type = []
 
     while True:
         line = f.readline()
@@ -124,7 +132,7 @@ def read_buffer(f):
             elif word.startswith("NODE"):
                 points, point_gid = _read_nodes(f, point_gid, points)
             elif word.startswith("ELEMENT"):
-                cells, el_gid = _read_cells(f, word, el_gid, cells)
+                cells, el_gid = _read_cells(f, word, el_gid, el_type, cells)
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
                 set_ids = read_set(f, params_map)
@@ -160,7 +168,7 @@ def read_buffer(f):
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_gid(point_gid, cells)
     nsets = _scan_gid(point_gid, nsets)
-    ssets = _scan_ss_gid(el_gid, ssets)
+    ssets = _scan_ss_gid(el_gid, el_type, ssets)
     return points, cells, point_data, cell_data, field_data, nsets, ssets
 
 
@@ -178,7 +186,7 @@ def _read_nodes(f, point_gid, points):
     return points, point_gid
 
 
-def _read_cells(f, line0, el_gid, cells):
+def _read_cells(f, line0, el_gid, el_type, cells):
     sline = line0.split(",")[1:]
     etype_sline = sline[0]
     assert "TYPE" in etype_sline, etype_sline
@@ -197,6 +205,7 @@ def _read_cells(f, line0, el_gid, cells):
             break
         data = [int(k) for k in filter(None, line.split(","))]
         el_gid = numpy.append(el_gid, int(data[0]))
+        el_type.append(etype) 
         cells[t].append(data[-num_nodes_per_elem:])
 
     # convert to numpy arrays
@@ -221,6 +230,12 @@ def _scan_ss_gid(el_gid, ssets):
         for i, value in enumerate(arr[:,0]):
             na = numpy.flatnonzero(el_gid == value)[0]
             arr[i,0] = na
+        if k not in abaqus_to_exodus_face:
+            msg = "Surface index not available foe element: " + k
+            raise RuntimeError(msg)
+        face_index = abaqus_to_exodus_face[k]
+        for i, value in enumerate(arr[:,1]):
+            arr[i,1] = face_index[i]
         ssets[k] = arr
     return ssets
 
