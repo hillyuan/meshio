@@ -101,7 +101,8 @@ def read_buffer(f):
     # Initialize the optional data fields
     points = []
     cells = {}
-    nsets = {}
+    node_sets = {}
+    side_sets = {}
     elsets = {}
     field_data = {}
     cell_data = {}
@@ -126,11 +127,26 @@ def read_buffer(f):
                 cells = _read_cells(f, word, cells)
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
-                setids = read_set(f, params_map)
+                set_ids = read_set(f, params_map)
                 name = params_map["NSET"]
-                if name not in nsets:
-                    nsets[name] = []
-                nsets[name].append(setids)
+                if name not in node_sets:
+                    node_sets[name] = []
+                    a = numpy.array([], dtype=int)
+                else:
+                    a = node_sets[name]
+                c = numpy.concatenate((a, set_ids))
+                node_sets[name] = c
+            elif word.startswith("SURFACE"):
+                params_map = get_param_map(word, required_keys=["NAME"])
+                es_ids = read_s_set(f)
+                name = params_map["NAME"]
+                if name not in side_sets:
+                    side_sets[name] = []
+                    a = numpy.array([], dtype=int)
+                else:
+                    a = side_sets[name]
+                c = numpy.concatenate((a, es_ids))
+                side_sets[name] = c
             elif word.startswith("ELSET"):
                 params_map = get_param_map(word, required_keys=["ELSET"])
                 setids = read_set(f, params_map)
@@ -144,7 +160,7 @@ def read_buffer(f):
     points = numpy.reshape(points, (-1, 3))
     cells = _scan_cells(point_gid, cells)
     return Mesh(
-        points, cells, point_data=point_data, cell_data=cell_data, field_data=field_data
+        points, cells, point_data=point_data, cell_data=cell_data, field_data=field_data, node_sets=node_sets, side_sets=side_sets
     )
 
 
@@ -240,26 +256,45 @@ def get_param_map(word, required_keys=None):
 
 def read_set(f, params_map):
     """reads a set"""
-    set_ids = []
+    set_ids = numpy.array([], dtype=int)
     while True:
         last_pos = f.tell()
         line = f.readline()
         if line.startswith("*"):
             break
-        set_ids += line.strip(", ").split(",")
+        lset_ids = line.strip().split(",")
 
-    if "generate" in params_map:
-        assert len(set_ids) == 3, set_ids
-        set_ids = numpy.arange(int(set_ids[0]), int(set_ids[1]), int(set_ids[2]))
-    else:
-        try:
-            set_ids = numpy.unique(numpy.array(set_ids, dtype="int32"))
-        except ValueError:
-            print(set_ids)
-            raise
+        if "GENERATE" in params_map:
+            assert len(lset_ids) == 3, lset_ids
+            set_ids = numpy.append( set_ids, numpy.arange(int(lset_ids[0]), 
+                int(lset_ids[1])+1, int(lset_ids[2])) )
+        else:
+            try:
+                set_ids += numpy.unique(numpy.array(lset_ids, dtype="int32"))
+            except ValueError:
+                print(set_ids)
+                raise
     f.seek(last_pos)
     return set_ids
 
+
+def read_s_set(f):
+    """read a side set"""
+    es_ids = numpy.array([], dtype=int)
+    p = numpy.arange(2, dtype=int)
+    while True:
+        last_pos = f.tell()
+        line = f.readline()
+        if line.startswith("*"):
+            break
+        set_ids = line.strip().split(",")
+        assert len(set_ids) == 2, set_ids
+        p[0] = int(set_ids[0])
+        p[1] = int(set_ids[1].strip().upper().strip("S"))
+        es_ids = numpy.append( es_ids, p )
+
+    f.seek(last_pos)
+    return es_ids
 
 def write(filename, mesh):
     with open(filename, "wt") as f:
