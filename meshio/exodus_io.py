@@ -81,8 +81,12 @@ def read(filename):
     pd = []
     cells = {}
     ns_names = []
-    ns = []
+    node_ns = []
     node_sets = {}
+    ss_names = []
+    elem_ss = []
+    side_ss = []
+    side_sets = {}
     for key, value in nc.variables.items():
         if key[:7] == "connect":
             meshio_type = exodus_to_meshio_type[value.elem_type.upper()]
@@ -107,13 +111,22 @@ def read(filename):
             value.set_auto_mask(False)
             ns_names = [b"".join(c).decode("UTF-8") for c in value[:]]
         elif key == "node_ns":
-            ns = value
+            node_ns = value
+        elif key == "ss_names":
+            value.set_auto_mask(False)
+            ss_names = [b"".join(c).decode("UTF-8") for c in value[:]]
+        elif key == "elem_ss":
+            elem_ss = value
+        elif key == "side_ss":
+            side_ss = value
 
     point_data = {name: dat for name, dat in zip(point_data_names, pd)}
-    node_sets = {name: dat for name, dat in zip(ns_names, ns)}
+    node_sets = {name: dat for name, dat in zip(ns_names, node_ns)}
+    if len(elem_ss)>0:
+        side_sets = {name: dat for name, dat in zip(ss_names, numpy.column_stack(elem_ss,side_ss))}
 
     nc.close()
-    return Mesh(points, cells, point_data=point_data, node_sets=node_sets)
+    return Mesh(points, cells, point_data=point_data, node_sets=node_sets, side_sets=side_sets)
 
 
 numpy_to_exodus_dtype = {
@@ -150,6 +163,7 @@ def write(filename, mesh):
     rootgrp.createDimension("num_elem", total_num_elems)
     rootgrp.createDimension("num_el_blk", len(mesh.cells))
     rootgrp.createDimension("num_node_sets", len(mesh.node_sets))
+    rootgrp.createDimension("num_side_sets", len(mesh.side_sets))
     rootgrp.createDimension("len_string", 33)
     rootgrp.createDimension("len_line", 81)
     rootgrp.createDimension("four", 4)
@@ -230,6 +244,23 @@ def write(filename, mesh):
             data = rootgrp.createVariable("node_ns{}".format(k + 1), dtype, (dim1,))
             # Exodus is 1-based
             data[:] = values + 1
+            
+    #side sets
+    if len(mesh.side_sets)>0:
+        data = rootgrp.createVariable("ss_prop1", "i4", "num_side_sets")
+        data_names = rootgrp.createVariable("ss_names", "S1", ("num_side_sets", "len_string"))
+        for k, name in enumerate(mesh.side_sets.keys()):
+            data[k] = k
+            for i, letter in enumerate(name):
+                data_names[k, i] = letter.encode("utf-8")
+        for k, (key, values) in enumerate(mesh.side_sets.items()):
+            dim1 = "num_side_ss{}".format(k + 1)
+            rootgrp.createDimension(dim1, values.shape[0])
+            dtype = numpy_to_exodus_dtype[values.dtype.name]
+            data = rootgrp.createVariable("elem_ss{}".format(k + 1), dtype, (dim1,))
+            data[:] = values[:,0] + 1
+            data = rootgrp.createVariable("side_ss{}".format(k + 1), dtype, (dim1,))
+            data[:] = values[:,1]
 
     rootgrp.close()
     return

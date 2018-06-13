@@ -12,6 +12,7 @@ class Mesh(object):
         cell_data=None,
         field_data=None,
         node_sets=None,
+        side_sets=None,
     ):
         self.points = points
         self.cells = cells
@@ -19,6 +20,7 @@ class Mesh(object):
         self.cell_data = cell_data if cell_data else {}
         self.field_data = field_data if field_data else {}
         self.node_sets = node_sets if node_sets else {}
+        self.side_sets = side_sets if side_sets else {}
         return
 
     def __repr__(self):
@@ -30,6 +32,8 @@ class Mesh(object):
 
         if self.node_sets:
             lines.append("Node sets: {}".format(", ".join(self.node_sets.keys())))
+        if self.side_sets:
+            lines.append("Side sets: {}".format(", ".join(self.side_sets.keys())))
 
         if self.point_data:
             lines.append("Point data: {}".format(", ".join(self.point_data.keys())))
