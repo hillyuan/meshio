@@ -311,4 +311,11 @@ def write(filename, mesh):
                 eid += 1
                 nids_strs = (str(nid + 1) for nid in row.tolist())
                 f.write(str(eid) + "," + ",".join(nids_strs) + "\n")
+        for ns_name, node_ids in mesh.node_sets.items():
+            f.write("*Nset,Nset=" + ns_name + "\n")
+            for i, nd in enumerate(node_ids):
+                f.write( str(nd) + "," )
+                if i%10 == 9:
+                    f.write( "\n")
+            f.write( "\n")
         f.write("*end")
