@@ -146,6 +146,7 @@ def read_buffer(f):
                 else:
                     a = side_sets[name]
                 c = numpy.concatenate((a, es_ids))
+                c = numpy.reshape( c,(-1,2) )
                 side_sets[name] = c
             elif word.startswith("ELSET"):
                 params_map = get_param_map(word, required_keys=["ELSET"])
@@ -270,7 +271,7 @@ def read_set(f, params_map):
                 int(lset_ids[1])+1, int(lset_ids[2])) )
         else:
             try:
-                set_ids += numpy.unique(numpy.array(lset_ids, dtype="int32"))
+                set_ids = numpy.append(set_ids, numpy.array(lset_ids, dtype="int32"))
             except ValueError:
                 print(set_ids)
                 raise
@@ -313,9 +314,18 @@ def write(filename, mesh):
                 f.write(str(eid) + "," + ",".join(nids_strs) + "\n")
         for ns_name, node_ids in mesh.node_sets.items():
             f.write("*Nset,Nset=" + ns_name + "\n")
+            a = ""
             for i, nd in enumerate(node_ids):
-                f.write( str(nd) + "," )
+                a = a + str(nd) +","
                 if i%10 == 9:
-                    f.write( "\n")
-            f.write( "\n")
+                    a = a[:-1] + "\n"
+                    f.write(a)
+                    a = ""
+            if len(a)>0:
+                a = a[:-1] + "\n"
+                f.write(a)
+        for ss_name, elem_ns in mesh.side_sets.items():
+            f.write("*Surface,name=" + ss_name + "\n")
+            for i in elem_ns:
+                f.write( str(i[0]) + ",S" + str(i[1]) + "\n" )
         f.write("*end")
