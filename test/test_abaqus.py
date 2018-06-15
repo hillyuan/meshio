@@ -19,6 +19,8 @@ import helpers
         helpers.tet10_mesh,
         helpers.hex_mesh,
         helpers.hex20_mesh,
+        helpers.add_node_side_sets(helpers.tri_mesh),
+        helpers.add_node_side_sets(helpers.tet_mesh),
     ],
 )
 def test(mesh):

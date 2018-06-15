@@ -11,6 +11,19 @@ from .__about__ import __version__
 from .gmsh_io import num_nodes_per_cell
 from .mesh import Mesh
 
+abaqus_to_exodus_face = {
+    "S3": [1,2,3],
+    "S3R": [1,2,3],
+    "S3RS": [1,2,3],
+    "S4": [1,2,3,4,5,6],
+    "S4R": [1,2,3,4,5,6],
+    "S4RS": [1,2,3,4,5,6],
+    "C3D4": [4,1,2,3],
+    "C3D4H": [4,1,2,3],
+    "C3D8": [5,6,1,2,3,4],
+    "C3D6": [4,5,1,2,3],
+}
+
 
 abaqus_to_meshio_type = {
     # trusss
@@ -103,11 +116,13 @@ def read_buffer(f):
     cells = {}
     node_sets = {}
     side_sets = {}
-    elsets = {}
+    el_sets = {}
     field_data = {}
     cell_data = {}
     point_data = {}
     point_gid = numpy.array([], dtype=int)
+    el_gid = numpy.array([], dtype=int)
+    el_type = []
 
     while True:
         line = f.readline()
@@ -121,10 +136,14 @@ def read_buffer(f):
                 pass
             elif word.startswith("PREPRINT"):
                 pass
+            elif word.startswith("NODE PRINT",0,len("NODE PRINT")):
+                pass
+            elif word.startswith("NODE FILE",0,len("NODE FILE")):
+                pass
             elif word.startswith("NODE"):
                 points, point_gid = _read_nodes(f, point_gid, points)
             elif word.startswith("ELEMENT"):
-                cells = _read_cells(f, word, cells)
+                cells, el_gid = _read_cells(f, word, el_gid, el_type, cells)
             elif word.startswith("NSET"):
                 params_map = get_param_map(word, required_keys=["NSET"])
                 set_ids = read_set(f, params_map)
@@ -150,16 +169,21 @@ def read_buffer(f):
                 side_sets[name] = c
             elif word.startswith("ELSET"):
                 params_map = get_param_map(word, required_keys=["ELSET"])
-                setids = read_set(f, params_map)
+                es_ids = read_set(f, params_map)
                 name = params_map["ELSET"]
-                if name not in elsets:
-                    elsets[name] = []
-                elsets[name].append(setids)
+                if name not in el_sets:
+                    el_sets[name] = []
+                    a = numpy.array([], dtype=int)
+                else:
+                    a = el_sets[name]
+                el_sets[name].append(es_ids)
             else:
                 pass
 
     points = numpy.reshape(points, (-1, 3))
-    cells = _scan_cells(point_gid, cells)
+    cells = _scan_gid(point_gid, cells)
+    node_sets = _scan_gid(point_gid, node_sets)
+    side_sets = _scan_ss_gid(el_gid, el_type, side_sets)
     return Mesh(
         points, cells, point_data=point_data, cell_data=cell_data, field_data=field_data, node_sets=node_sets, side_sets=side_sets
     )
@@ -169,6 +193,8 @@ def _read_nodes(f, point_gid, points):
     while True:
         last_pos = f.tell()
         line = f.readline()
+        if not line:
+            break
         if line.startswith("*"):
             break
         data = [float(k) for k in filter(None, line.strip().split(","))]
@@ -179,7 +205,7 @@ def _read_nodes(f, point_gid, points):
     return points, point_gid
 
 
-def _read_cells(f, line0, cells):
+def _read_cells(f, line0, el_gid, el_type, cells):
     sline = line0.split(",")[1:]
     etype_sline = sline[0]
     assert "TYPE" in etype_sline, etype_sline
@@ -194,9 +220,14 @@ def _read_cells(f, line0, cells):
     while True:
         last_pos = f.tell()
         line = f.readline()
+        if not line:
+            break
         if line.startswith("*"):
             break
         data = [int(k) for k in filter(None, line.split(","))]
+        print (data)
+        el_gid = numpy.append(el_gid, int(data[0]))
+        el_type.append(etype)
         cells[t].append(data[-num_nodes_per_elem:])
 
     # convert to numpy arrays
@@ -206,14 +237,29 @@ def _read_cells(f, line0, cells):
         cells[key] = numpy.array(cells[key], dtype=int)
 
     f.seek(last_pos)
-    return cells
+    return cells, el_gid
 
 
-def _scan_cells(point_gid, cells):
-    for arr in cells.values():
+def _scan_gid(point_gid, pids):
+    for arr in pids.values():
         for value in numpy.nditer(arr, op_flags=["readwrite"]):
             value[...] = numpy.flatnonzero(point_gid == value)[0]
-    return cells
+    return pids
+
+def _scan_ss_gid(el_gid, el_type, ssets):
+    for k, arr in ssets.items():
+        arr = numpy.reshape( arr,(-1,2) )
+        for i, value in enumerate(arr[:,0]):
+            na = numpy.flatnonzero(el_gid == value)[0]
+            arr[i,0] = na
+            etype = el_type[na]
+            if etype not in abaqus_to_exodus_face:
+                msg = "Surface index not available for element: " + etype
+                raise RuntimeError(msg)
+            face_index = abaqus_to_exodus_face[etype]
+            arr[i,1] = face_index[arr[i,1]-1] + 1
+        ssets[k] = arr
+    return ssets
 
 
 def get_param_map(word, required_keys=None):
@@ -286,6 +332,8 @@ def read_s_set(f):
     while True:
         last_pos = f.tell()
         line = f.readline()
+        if not line:
+            break
         if line.startswith("*"):
             break
         set_ids = line.strip().split(",")
@@ -304,19 +352,19 @@ def write(filename, mesh):
         f.write("written by meshio v{}\n".format(__version__))
         f.write("*Node\n")
         for k, x in enumerate(mesh.points):
-            f.write("{}, {!r}, {!r}, {!r}\n".format(k + 1, x[0], x[1], x[2]))
+            f.write("{}, {!r}, {!r}, {!r}\n".format(k+1, x[0], x[1], x[2]))
         eid = 0
         for cell_type, node_idcs in mesh.cells.items():
             f.write("*Element,type=" + meshio_to_abaqus_type[cell_type] + "\n")
             for row in node_idcs:
                 eid += 1
-                nids_strs = (str(nid + 1) for nid in row.tolist())
+                nids_strs = (str(nid+1) for nid in row.tolist())
                 f.write(str(eid) + "," + ",".join(nids_strs) + "\n")
         for ns_name, node_ids in mesh.node_sets.items():
             f.write("*Nset,Nset=" + ns_name + "\n")
             a = ""
             for i, nd in enumerate(node_ids):
-                a = a + str(nd) +","
+                a = a + str(nd+1) +","
                 if i%10 == 9:
                     a = a[:-1] + "\n"
                     f.write(a)
@@ -327,5 +375,5 @@ def write(filename, mesh):
         for ss_name, elem_ns in mesh.side_sets.items():
             f.write("*Surface,name=" + ss_name + "\n")
             for i in elem_ns:
-                f.write( str(i[0]) + ",S" + str(i[1]) + "\n" )
-        f.write("*end")
+                f.write( str(i[0]+1) + ",S" + str(i[1]) + "\n" )
+   #     f.write("*end")
